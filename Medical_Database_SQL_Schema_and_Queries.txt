@@ -1,0 +1,172 @@
+
+Medical Database SQL Schema and Queries
+
+### SQL Code to Create Medical Database Tables
+
+-- Create Patients Table
+CREATE TABLE Patients (
+    patient_id INT PRIMARY KEY AUTO_INCREMENT,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    dob DATE NOT NULL,
+    gender ENUM('Male', 'Female', 'Other') NOT NULL,
+    phone VARCHAR(15),
+    address VARCHAR(100),
+    email VARCHAR(50),
+    emergency_contact VARCHAR(15)
+);
+
+-- Create Doctors Table
+CREATE TABLE Doctors (
+    doctor_id INT PRIMARY KEY AUTO_INCREMENT,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    specialty VARCHAR(50),
+    phone VARCHAR(15),
+    email VARCHAR(50),
+    department_id INT,
+    FOREIGN KEY (department_id) REFERENCES Departments(department_id)
+);
+
+-- Create Departments Table
+CREATE TABLE Departments (
+    department_id INT PRIMARY KEY AUTO_INCREMENT,
+    department_name VARCHAR(50) NOT NULL,
+    location VARCHAR(50)
+);
+
+-- Create Appointments Table
+CREATE TABLE Appointments (
+    appointment_id INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id INT NOT NULL,
+    doctor_id INT NOT NULL,
+    appointment_date DATE NOT NULL,
+    appointment_time TIME NOT NULL,
+    reason VARCHAR(100),
+    status ENUM('Scheduled', 'Completed', 'Cancelled') DEFAULT 'Scheduled',
+    FOREIGN KEY (patient_id) REFERENCES Patients(patient_id),
+    FOREIGN KEY (doctor_id) REFERENCES Doctors(doctor_id)
+);
+
+-- Create Prescriptions Table
+CREATE TABLE Prescriptions (
+    prescription_id INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id INT NOT NULL,
+    doctor_id INT NOT NULL,
+    appointment_id INT,
+    prescription_date DATE NOT NULL,
+    notes TEXT,
+    FOREIGN KEY (patient_id) REFERENCES Patients(patient_id),
+    FOREIGN KEY (doctor_id) REFERENCES Doctors(doctor_id),
+    FOREIGN KEY (appointment_id) REFERENCES Appointments(appointment_id)
+);
+
+-- Create Medications Table
+CREATE TABLE Medications (
+    medication_id INT PRIMARY KEY AUTO_INCREMENT,
+    prescription_id INT NOT NULL,
+    medication_name VARCHAR(50) NOT NULL,
+    dosage VARCHAR(50),
+    frequency VARCHAR(50),
+    duration VARCHAR(50),
+    FOREIGN KEY (prescription_id) REFERENCES Prescriptions(prescription_id)
+);
+
+-- Create Billing Table
+CREATE TABLE Billing (
+    billing_id INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id INT NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    billing_date DATE NOT NULL,
+    status ENUM('Paid', 'Pending') DEFAULT 'Pending',
+    FOREIGN KEY (patient_id) REFERENCES Patients(patient_id)
+);
+
+## SQL Query Questions and Answers
+
+1. Find all patients who have appointments scheduled in the next 7 days.
+
+SELECT p.first_name, p.last_name, a.appointment_date, a.appointment_time
+FROM Patients p
+JOIN Appointments a ON p.patient_id = a.patient_id
+WHERE a.appointment_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+AND a.status = 'Scheduled';
+
+
+2. List doctors who have appointments with more than 5 different patients.
+
+SELECT d.first_name, d.last_name, COUNT(DISTINCT a.patient_id) AS unique_patients
+FROM Doctors d
+JOIN Appointments a ON d.doctor_id = a.doctor_id
+GROUP BY d.doctor_id
+HAVING unique_patients > 5;
+
+
+3. Retrieve the list of patients who haven’t completed any appointments in the last month.
+
+SELECT p.first_name, p.last_name
+FROM Patients p
+LEFT JOIN Appointments a ON p.patient_id = a.patient_id
+WHERE (a.appointment_date < DATE_SUB(CURDATE(), INTERVAL 1 MONTH) OR a.appointment_date IS NULL)
+AND (a.status = 'Scheduled' OR a.status = 'Cancelled' OR a.status IS NULL);
+
+
+4. Find the total billing amount for each patient with unpaid bills.
+
+SELECT p.first_name, p.last_name, SUM(b.amount) AS total_due
+FROM Patients p
+JOIN Billing b ON p.patient_id = b.patient_id
+WHERE b.status = 'Pending'
+GROUP BY p.patient_id;
+
+
+5. List all medications prescribed by a specific doctor (e.g., Dr. John Doe).
+
+SELECT m.medication_name, m.dosage, m.frequency, p.first_name AS patient_first_name, p.last_name AS patient_last_name
+FROM Medications m
+JOIN Prescriptions pr ON m.prescription_id = pr.prescription_id
+JOIN Doctors d ON pr.doctor_id = d.doctor_id
+JOIN Patients p ON pr.patient_id = p.patient_id
+WHERE d.first_name = 'John' AND d.last_name = 'Doe';
+
+
+6. Find the most commonly prescribed medication and how many times it has been prescribed.
+
+SELECT medication_name, COUNT(*) AS prescription_count
+FROM Medications
+GROUP BY medication_name
+ORDER BY prescription_count DESC
+LIMIT 1;
+
+
+7. Retrieve details of all completed appointments for a patient with patient_id = 10.
+
+SELECT a.appointment_id, d.first_name AS doctor_first_name, d.last_name AS doctor_last_name, a.appointment_date, a.appointment_time, a.reason
+FROM Appointments a
+JOIN Doctors d ON a.doctor_id = d.doctor_id
+WHERE a.patient_id = 10 AND a.status = 'Completed';
+
+
+8. List departments along with the number of doctors in each department.
+
+SELECT dep.department_name, COUNT(d.doctor_id) AS num_of_doctors
+FROM Departments dep
+LEFT JOIN Doctors d ON dep.department_id = d.department_id
+GROUP BY dep.department_name;
+
+
+9. Find patients with unpaid bills older than 30 days.
+
+SELECT p.first_name, p.last_name, b.billing_date, b.amount
+FROM Patients p
+JOIN Billing b ON p.patient_id = b.patient_id
+WHERE b.status = 'Pending' AND b.billing_date < DATE_SUB(CURDATE(), INTERVAL 30 DAY);
+
+
+10. List all doctors who have not prescribed any medications.
+
+SELECT d.first_name, d.last_name
+FROM Doctors d
+LEFT JOIN Prescriptions p ON d.doctor_id = p.doctor_id
+WHERE p.prescription_id IS NULL;
+
